@@ -98,13 +98,10 @@ async def handle_incoming_message(
             try:
                 # Таймаут 6 сек
                 from app.services.rag_ai import generate_ai_reply_rag
-                try:
-                    return await asyncio.wait_for(
-                        generate_ai_reply_rag(client_message, manager.config),
-                        timeout=10
-                    )
-                except asyncio.TimeoutError:
-                    return None
+                return await asyncio.wait_for(
+                    generate_ai_reply(client_message, manager.config),
+                    timeout=6
+                )
             except asyncio.TimeoutError:
                 print("AI timeout: exceeded 6 seconds")
             except Exception as e:

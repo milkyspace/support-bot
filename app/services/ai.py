@@ -1,43 +1,59 @@
 import os
-from openai import OpenAI
 from typing import Optional
+from openai import OpenAI
 
-# Загружаем базу знаний из файла (можно заменить на БД)
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-KB_PATH = os.path.join(BASE_DIR, "..", "data", "knowledge_base.txt")
-
-with open(KB_PATH, "r", encoding="utf8") as f:
-    KNOWLEDGE_TEXT = f.read()
+from app.services.rag_search import search_similar  # <-- наш FAISS поиск
 
 
-async def generate_ai_reply(user_message: str,
-                            config,
-                            history: Optional[str] = None) -> str:
+async def generate_ai_reply(
+    user_message: str,
+    config,
+    history: Optional[str] = None
+) -> str:
     """
-    Создает черновик ответа на основе базы знаний и сообщения клиента.
+    Создаёт черновик ответа на основе RAG (FAISS) и сообщения клиента.
     """
 
+    # ---------- 1. Поиск похожих фрагментов в базе знаний ----------
+    try:
+        kb_matches = search_similar(user_message, top_k=5)
+        kb_text = "\n".join(f"- {m}" for m in kb_matches)
+    except Exception as e:
+        print("RAG error:", e)
+        kb_text = ""  # fallback
+
+
+    # ---------- 2. Формируем системный промпт ----------
     system_prompt = f"""
-Ты — профессиональный сотрудник службы поддержки VPN Ducks.
-Отвечаешь кратко, по делу, дружелюбно.
-Всегда учитывай базу знаний ниже, она имеет высший приоритет.
+Ты — вежливый и профессиональный сотрудник службы поддержки VPN Ducks.
 
-База знаний:
-{KNOWLEDGE_TEXT}
+Всегда отвечай:
+• кратко  
+• по делу  
+• дружелюбно  
+• учитывая приоритет базы знаний ниже  
+
+Если нужны уточнения — корректно попроси пользователя уточнить детали.
+
+База знаний (релевантные фрагменты):
+{kb_text}
 
 Если вопрос сложный — предложи несколько вариантов ответа.
     """
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-    ]
+
+    # ---------- 3. Формируем сообщения ----------
+    messages = [{"role": "system", "content": system_prompt}]
 
     if history:
         messages.append({"role": "assistant", "content": history})
 
     messages.append({"role": "user", "content": user_message})
 
+
+    # ---------- 4. OpenAI запрос ----------
     client = OpenAI(api_key=config.bot.OPENAI_API_KEY)
+
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=messages,
