@@ -1,10 +1,10 @@
 import os
-from aiogram import F
+from openai import OpenAI
 from typing import Optional
 
-from openai import OpenAI
+from app.config import Config
 
-client = OpenAI(api_key=F.config.bot.OPENAI_API_KEY)
+client = OpenAI(api_key=Config.bot.OPENAI_API_KEY)
 
 # Загружаем базу знаний из файла (можно заменить на БД)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
