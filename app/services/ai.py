@@ -7,8 +7,11 @@ from openai import OpenAI
 client = OpenAI(api_key=F.config.bot.OPENAI_API_KEY)
 
 # Загружаем базу знаний из файла (можно заменить на БД)
-with open("./knowledge_base.txt", "r", encoding="utf8") as f:
-    KNOWLEDGE = f.read()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+KB_PATH = os.path.join(BASE_DIR, "..", "data", "knowledge_base.txt")
+
+with open(KB_PATH, "r", encoding="utf8") as f:
+    KNOWLEDGE_TEXT = f.read()
 
 
 async def generate_ai_reply(user_message: str, history: Optional[str] = None) -> str:
