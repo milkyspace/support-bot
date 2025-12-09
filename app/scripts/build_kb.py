@@ -3,7 +3,6 @@ import json
 import chromadb
 from chromadb.config import Settings
 from textwrap import wrap
-from openai import OpenAI
 
 # шаг 1 — читаем JSON
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
