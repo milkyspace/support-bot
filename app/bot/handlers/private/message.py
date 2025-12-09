@@ -1,4 +1,5 @@
 import asyncio
+from distutils.command.config import config
 from typing import Optional
 
 from aiogram import Router, F
@@ -81,7 +82,7 @@ async def handle_incoming_message(
             client_message = message.text or message.caption or ""
 
             if client_message.strip():
-                ai_text = await generate_ai_reply(client_message)
+                ai_text = await generate_ai_reply(client_message, manager.config)
 
                 await message.bot.send_message(
                     chat_id=manager.config.bot.GROUP_ID,
