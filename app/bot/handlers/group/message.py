@@ -67,6 +67,7 @@ async def handler(message: Message, manager: Manager, redis: RedisStorage, album
         return
 
     # ------ AI DRAFT BLOCK ------
+    logging.debug(f'AI DRAFT BLOCK')
     try:
         # вытаскиваем текст клиентского сообщения
         client_message = message.text or message.caption or ""
