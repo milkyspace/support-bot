@@ -75,45 +75,6 @@ async def handle_incoming_message(
             user_data,
         )
 
-        # ------ AI DRAFT BLOCK ------
-        from app.services.ai import generate_ai_reply
-
-        async def safe_ai_call():
-            client_message = message.text or message.caption or ""
-            if not client_message.strip():
-                return None  # нет текста → нечего анализировать
-
-            try:
-                # таймаут 6 секунд
-                ai_text = await asyncio.wait_for(
-                    generate_ai_reply(client_message, manager.config),
-                    timeout=6
-                )
-                return ai_text
-            except asyncio.TimeoutError:
-                print("AI timeout: exceeded 6 seconds")
-                return None
-            except Exception as e:
-                print("AI error:", e)
-                return None
-
-        ai_text = await safe_ai_call()
-
-        if ai_text:
-            # отправляем черновик в тему поддержки
-            try:
-                import html
-                safe_ai_text = html.escape(ai_text)
-                await message.bot.send_message(
-                    chat_id=manager.config.bot.GROUP_ID,
-                    text=f"🤖 <b>AI предлагает ответ:</b>\n\n<blockquote>{safe_ai_text}</blockquote>",
-                    message_thread_id=message_thread_id,
-                    parse_mode="HTML",
-                )
-            except Exception as e:
-                print("Failed to send AI message:", e)
-        # ------ END AI BLOCK ------
-
         if not album:
             await message.forward(
                 chat_id=manager.config.bot.GROUP_ID,
@@ -125,6 +86,62 @@ async def handle_incoming_message(
                 message_thread_id=message_thread_id,
             )
 
+        # ------ AI DRAFT BLOCK ------
+        from app.services.ai import generate_ai_reply
+        import html
+
+        async def safe_ai_call():
+            client_message = message.text or message.caption or ""
+            if not client_message.strip():
+                return None  # нет текста → нечего анализировать
+
+            try:
+                # Таймаут 6 сек
+                from app.services.rag_ai import generate_ai_reply_rag
+                try:
+                    return await asyncio.wait_for(
+                        generate_ai_reply_rag(client_message, manager.config),
+                        timeout=10
+                    )
+                except asyncio.TimeoutError:
+                    return None
+            except asyncio.TimeoutError:
+                print("AI timeout: exceeded 6 seconds")
+            except Exception as e:
+                print("AI error:", e)
+
+            return None
+
+        ai_text = await safe_ai_call()
+
+        if ai_text:
+            try:
+                # Экранируем HTML, чтобы не сломать разметку
+                safe_ai = html.escape(ai_text)
+
+                preview = f"🤖 <b>AI предлагает ответ:</b>\n\n<blockquote>{safe_ai}</blockquote>"
+
+                # Telegram ограничивает 4096 символов
+                if len(preview) > 3800:
+                    chunks = [preview[i:i + 3500] for i in range(0, len(preview), 3500)]
+                    for chunk in chunks:
+                        await message.bot.send_message(
+                            chat_id=manager.config.bot.GROUP_ID,
+                            text=chunk,
+                            message_thread_id=message_thread_id,
+                            parse_mode="HTML",
+                        )
+                else:
+                    await message.bot.send_message(
+                        chat_id=manager.config.bot.GROUP_ID,
+                        text=preview,
+                        message_thread_id=message_thread_id,
+                        parse_mode="HTML",
+                    )
+
+            except Exception as e:
+                print("Failed to send AI preview:", e)
+        # ------ END AI BLOCK ------
     try:
         await copy_message_to_topic()
     except TelegramBadRequest as ex:
