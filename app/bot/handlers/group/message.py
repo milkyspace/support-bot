@@ -58,7 +58,7 @@ from app.services.ai import generate_ai_reply
 @router.message(F.media_group_id, F.from_user[F.is_bot.is_(False)])
 @router.message(F.media_group_id.is_(None), F.from_user[F.is_bot.is_(False)])
 async def handler(message: Message, manager: Manager, redis: RedisStorage, album: Optional[Album] = None) -> None:
-
+    print(f'message')
     user_data = await redis.get_by_message_thread_id(message.message_thread_id)
     if not user_data:
         return
@@ -67,14 +67,14 @@ async def handler(message: Message, manager: Manager, redis: RedisStorage, album
         return
 
     # ------ AI DRAFT BLOCK ------
-    logging.debug(f'AI DRAFT BLOCK')
+    print(f'AI DRAFT BLOCK')
     try:
         # вытаскиваем текст клиентского сообщения
         client_message = message.text or message.caption or ""
 
         if client_message.strip():
             ai_text = await generate_ai_reply(client_message)
-            logging.debug(f'{ai_text}')
+            print(f'{ai_text}')
 
             await message.bot.send_message(
                 chat_id=manager.config.bot.GROUP_ID,
