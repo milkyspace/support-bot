@@ -1,33 +1,28 @@
-import chromadb
-from chromadb.config import Settings
+import html
 from openai import OpenAI
 
-# подключаемся к локальной векторной базе
-chroma = chromadb.Client(Settings(
-    chroma_db_impl="duckdb+parquet",
-    persist_directory="./vector_db"
-))
-
-kb = chroma.get_collection("support_kb")
+from app.services.rag_search import search_similar
 
 
 async def generate_ai_reply_rag(user_message: str, config) -> str:
     """
-    Достаёт лучшие фрагменты из базы знаний и формирует ответ.
+    Использует FAISS для поиска похожих сообщений
+    и формирует RAG-ответ.
     """
 
-    # 1) ищем ближайшие куски
-    results = kb.query(
-        query_texts=[user_message],
-        n_results=5,
-    )
-    context = "\n---\n".join(results["documents"][0])
+    # 1) Ищем релевантные фрагменты из базы
+    top_chunks = search_similar(user_message, top_k=5)
 
-    # 2) формируем финальный prompt
+    context = "\n---\n".join(top_chunks)
+
+    # 2) Формируем RAG-промпт
     prompt = f"""
 Ты — сотрудник поддержки VPN Ducks.
 
-Используй контекст ниже, он всегда имеет приоритет:
+Используй контекст ниже. 
+Если в контексте есть точная инструкция — следуй ей. 
+Если контекст не подходит — отвечай как обычно, но опирайся на стиль ответов.
+Если клиент пишет неполно — уточняй.
 
 Контекст:
 {context}
@@ -35,17 +30,22 @@ async def generate_ai_reply_rag(user_message: str, config) -> str:
 Сообщение клиента:
 {user_message}
 
-Ответь дружелюбно, кратко, по делу.
+Ответь:
+- кратко
+- дружелюбно
+- по делу
+- дай чёткие шаги, если нужны
 """
 
-    # 3) генерируем ответ
     client = OpenAI(api_key=config.bot.OPENAI_API_KEY)
+
     completion = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": "Ты — профессиональный сотрудник поддержки."},
+            {"role": "system", "content": "Ты — опытный сотрудник поддержки VPN Ducks."},
             {"role": "user", "content": prompt}
-        ]
+        ],
+        temperature=0.25,
     )
 
-    return completion.choices[0].message.content
+    return completion.choices[0].message.content.strip()
