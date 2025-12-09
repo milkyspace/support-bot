@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional
 
 from aiogram import Router, F
@@ -72,6 +73,7 @@ async def handler(message: Message, manager: Manager, redis: RedisStorage, album
 
         if client_message.strip():
             ai_text = await generate_ai_reply(client_message)
+            logging.debug(f'{ai_text}')
 
             await message.bot.send_message(
                 chat_id=manager.config.bot.GROUP_ID,

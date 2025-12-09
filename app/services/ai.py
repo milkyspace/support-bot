@@ -25,7 +25,7 @@ async def generate_ai_reply(user_message: str, history: Optional[str] = None) ->
 Всегда учитывай базу знаний ниже, она имеет высший приоритет.
 
 База знаний:
-{KNOWLEDGE}
+{KNOWLEDGE_TEXT}
 
 Если вопрос сложный — предложи несколько вариантов ответа.
     """
