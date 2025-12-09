@@ -77,21 +77,41 @@ async def handle_incoming_message(
 
         # ------ AI DRAFT BLOCK ------
         from app.services.ai import generate_ai_reply
-        try:
-            # вытаскиваем текст клиентского сообщения
+
+        async def safe_ai_call():
             client_message = message.text or message.caption or ""
+            if not client_message.strip():
+                return None  # нет текста → нечего анализировать
 
-            if client_message.strip():
-                ai_text = await generate_ai_reply(client_message, manager.config)
+            try:
+                # таймаут 6 секунд
+                ai_text = await asyncio.wait_for(
+                    generate_ai_reply(client_message, manager.config),
+                    timeout=6
+                )
+                return ai_text
+            except asyncio.TimeoutError:
+                print("AI timeout: exceeded 6 seconds")
+                return None
+            except Exception as e:
+                print("AI error:", e)
+                return None
 
+        ai_text = await safe_ai_call()
+
+        if ai_text:
+            # отправляем черновик в тему поддержки
+            try:
+                import html
+                safe_ai_text = html.escape(ai_text)
                 await message.bot.send_message(
                     chat_id=manager.config.bot.GROUP_ID,
-                    text=f"🤖 *AI предлагает ответ:*\n\n<code>{ai_text}</code>",
+                    text=f"🤖 <b>AI предлагает ответ:</b>\n\n<blockquote>{safe_ai_text}</blockquote>",
                     message_thread_id=message_thread_id,
-                    parse_mode="Markdown",
+                    parse_mode="HTML",
                 )
-        except Exception as e:
-            print("AI error:", e)
+            except Exception as e:
+                print("Failed to send AI message:", e)
         # ------ END AI BLOCK ------
 
         if not album:
