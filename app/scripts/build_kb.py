@@ -1,46 +1,63 @@
-import os
+
 import json
-import chromadb
-from chromadb.config import Settings
-from textwrap import wrap
+import os
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
+from tqdm import tqdm
 
-# шаг 1 — читаем JSON
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-KB_PATH = os.path.join(BASE_DIR, "..", "data", "knowledge.json")
-with open(KB_PATH, "r", encoding="utf8") as f:
-    data = json.load(f)
+DATA_PATH = os.path.join(BASE_DIR, "..", "data", "knowledge.json")  # наш JSON
+INDEX_PATH = os.path.join(BASE_DIR, "..", "data", "kb.index")
+TEXTS_PATH = os.path.join(BASE_DIR, "..", "data", "kb_texts.npy")
 
-# шаг 2 — инициализируем локальное хранилище vectordb
-chroma = chromadb.Client(Settings(chroma_db_impl="duckdb+parquet", persist_directory="./vector_db"))
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 
-collection = chroma.get_or_create_collection(
-    name="support_kb",
-    metadata={"hnsw:space": "cosine"}
-)
+def extract_messages(json_path):
+    with open(json_path, "r", encoding="utf8") as f:
+        data = json.load(f)
 
-def chunk_text(text, size=800):
-    return [t.strip() for t in wrap(text, size) if t.strip()]
+    texts = []
 
-# шаг 3 — нарезаем и загружаем векторы
-documents = []
-ids = []
+    for chat in data["chats"]["list"]:
+        for msg in chat["messages"]:
+            if msg.get("text"):
+                # Превращаем text в строку (в экспорте Telegram это может быть массив / dict)
+                if isinstance(msg["text"], list):
+                    text_part = "".join(
+                        p["text"] if isinstance(p, dict) else str(p)
+                        for p in msg["text"]
+                    )
+                else:
+                    text_part = str(msg["text"])
 
-i = 0
-for chat in data["chats"]["list"]:
-    for msg in chat["messages"]:
-        if isinstance(msg.get("text"), str):
-            chunks = chunk_text(msg["text"])
-            for chunk in chunks:
-                documents.append(chunk)
-                ids.append(f"msg_{i}")
-                i += 1
+                # сохраняем только полезные сообщения
+                if len(text_part.strip()) > 2:
+                    texts.append(text_part.strip())
 
-print(f"Загружаем {len(documents)} чанков...")
+    print(f"Всего сообщений собрано: {len(texts)}")
+    return texts
 
-# шаг 4 — создаём embeddings и пишем в БД
-collection.add(
-    documents=documents,
-    ids=ids
-)
 
-print("Готово! База знаний сохранена в ./vector_db")
+def build_index():
+    print("Загрузка сообщений...")
+    texts = extract_messages(DATA_PATH)
+
+    print("Создаём эмбеддинги...")
+    embeddings = model.encode(texts, batch_size=64, convert_to_numpy=True, show_progress_bar=True)
+
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dim)
+    index.add(embeddings)
+
+    print("Сохранение индекса...")
+    faiss.write_index(index, INDEX_PATH)
+    np.save(TEXTS_PATH, np.array(texts, dtype=object))
+
+    print("Готово!")
+    print("Индекс:", INDEX_PATH)
+    print("Тексты:", TEXTS_PATH)
+
+
+if __name__ == "__main__":
+    build_index()
