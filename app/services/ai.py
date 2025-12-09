@@ -7,7 +7,7 @@ from openai import OpenAI
 client = OpenAI(api_key=F.config.bot.OPENAI_API_KEY)
 
 # Загружаем базу знаний из файла (можно заменить на БД)
-with open("knowledge_base.txt", "r", encoding="utf8") as f:
+with open("./knowledge_base.txt", "r", encoding="utf8") as f:
     KNOWLEDGE = f.read()
 
 
