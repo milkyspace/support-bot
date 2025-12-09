@@ -1,9 +1,10 @@
 import os
+from aiogram import F
 from typing import Optional
 
 from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=F.config.bot.OPENAI_API_KEY)
 
 # Загружаем базу знаний из файла (можно заменить на БД)
 with open("knowledge_base.txt", "r", encoding="utf8") as f:

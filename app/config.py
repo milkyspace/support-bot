@@ -17,6 +17,7 @@ class BotConfig:
     TOKEN: str
     DEV_ID: int
     GROUP_ID: int
+    OPENAI_API_KEY: str
     BOT_EMOJI_ID: str
 
 
@@ -70,6 +71,7 @@ def load_config() -> Config:
             TOKEN=env.str("BOT_TOKEN"),
             DEV_ID=env.int("BOT_DEV_ID"),
             GROUP_ID=env.int("BOT_GROUP_ID"),
+            OPENAI_API_KEY=env.str("OPENAI_API_KEY"),
             BOT_EMOJI_ID=env.str("BOT_EMOJI_ID"),
         ),
         redis=RedisConfig(
