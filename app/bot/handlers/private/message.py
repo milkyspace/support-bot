@@ -1,4 +1,5 @@
 import asyncio
+from typing import Optional
 
 from aiogram import Router, F
 from aiogram.exceptions import TelegramBadRequest
@@ -44,7 +45,7 @@ async def handle_incoming_message(
         manager: Manager,
         redis: RedisStorage,
         user_data: UserData,
-        album: Album | None = None,
+        album: Optional[Album] = None,
 ) -> None:
     """
     Handles incoming messages and copies them to the forum topic.
@@ -72,6 +73,25 @@ async def handle_incoming_message(
             manager.config,
             user_data,
         )
+
+        # ------ AI DRAFT BLOCK ------
+        from app.services.ai import generate_ai_reply
+        try:
+            # вытаскиваем текст клиентского сообщения
+            client_message = message.text or message.caption or ""
+
+            if client_message.strip():
+                ai_text = await generate_ai_reply(client_message)
+
+                await message.bot.send_message(
+                    chat_id=manager.config.bot.GROUP_ID,
+                    text=f"🤖 *AI предлагает ответ:*\n\n<code>{ai_text}</code>",
+                    message_thread_id=message_thread_id,
+                    parse_mode="Markdown",
+                )
+        except Exception as e:
+            print("AI error:", e)
+        # ------ END AI BLOCK ------
 
         if not album:
             await message.forward(
